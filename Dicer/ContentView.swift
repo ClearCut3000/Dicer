@@ -12,6 +12,7 @@ struct ContentView: View {
   //MARK: - View Properties
   var diceTypes = [4, 6, 8, 10, 12, 20, 100]
 
+  @Environment(\.accessibilityVoiceOverEnabled) var voiceOverEnabled
   @AppStorage("selectedDiceType") var selectedDiceType = 6
   @AppStorage("numberToRoll") var numberToRoll = 4
 
@@ -22,6 +23,11 @@ struct ContentView: View {
                             on: .main,
                             in: .common).autoconnect()
   @State private var stoppedDice = 0
+
+  @State private var feedback = UIImpactFeedbackGenerator(style: .rigid)
+
+  let savePath = FileManager.documentsDirectory.appendingPathExtension("SavedRollas.json")
+  @State private var savedResults = [DiceResult]()
 
   let columns: [GridItem] = [
     .init(.adaptive(minimum: 60))
@@ -54,19 +60,44 @@ struct ContentView: View {
                   .padding(5)
               }
             }
+            .accessibilityElement()
+            .accessibilityLabel("Latest roll: \(currentResult.description)")
           }
           .disabled(stoppedDice < currentResult.rolls.count)
+          if savedResults.isEmpty == false {
+            Section("Previous results") {
+              ForEach(savedResults) { result in
+                VStack(alignment: .leading) {
+                  Text("\(result.number) * D\(result.type)")
+                    .font(.headline)
+                  Text(result.description)
+                }
+                .accessibilityElement()
+                .accessibilityLabel("\(result.number) D\(result.type), \(result.description)")
+              }
+            }
+          }
         }
         .navigationTitle("Dicer")
         .onReceive(timer) { date in
           updateDice()
         }
+        .onAppear(perform: load)
       }
     }
 
   //MARK: - View Methods
   func rollDice() {
     currentResult = DiceResult(type: selectedDiceType, number: numberToRoll)
+
+    if voiceOverEnabled {
+      stoppedDice = numberToRoll
+      savedResults.insert(currentResult, at: 0)
+      save()
+    } else {
+      stoppedDice = -20
+    }
+
     stoppedDice = 0
   }
 
@@ -75,8 +106,27 @@ struct ContentView: View {
     for i in stoppedDice..<numberToRoll {
       if i < 0 { continue }
       currentResult.rolls[i] = Int.random(in: 1...selectedDiceType)
+      feedback.impactOccurred()
     }
     stoppedDice += 1
+    if stoppedDice == numberToRoll {
+      savedResults.insert(currentResult, at: 0)
+      save()
+    }
+  }
+
+  func load() {
+    if let data = try? Data(contentsOf: savePath) {
+      if let results = try? JSONDecoder().decode([DiceResult].self, from: data) {
+        savedResults = results
+      }
+    }
+  }
+
+  func save() {
+    if let data = try? JSONEncoder().encode(savedResults) {
+      try? data.write(to: savePath, options: [.atomic, .completeFileProtection])
+    }
   }
 }
 
