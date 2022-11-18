@@ -45,7 +45,11 @@ struct ContentView: View {
             }
             .pickerStyle(.segmented)
             Stepper("Number of Dice: \(numberToRoll)", value: $numberToRoll, in: 1...20)
-            Button("Roll Them!", action: rollDice)
+            Button("Roll Them!") {
+              withAnimation {
+                rollDice()
+              }
+            }
           } footer: {
             LazyVGrid(columns: columns) {
               ForEach(0..<currentResult.rolls.count, id: \.self) { rollNumber in
@@ -59,6 +63,10 @@ struct ContentView: View {
                   .font(.title)
                   .padding(5)
               }
+              .transition(.asymmetric(
+                insertion: .move(edge: .trailing).combined(with: .opacity),
+                removal: .scale.combined(with: .opacity)
+              ))
             }
             .accessibilityElement()
             .accessibilityLabel("Latest roll: \(currentResult.description)")
