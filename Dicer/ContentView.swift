@@ -24,6 +24,8 @@ struct ContentView: View {
                             in: .common).autoconnect()
   @State private var stoppedDice = 0
 
+  @State private var isRolling = false
+
   @State private var feedback = UIImpactFeedbackGenerator(style: .rigid)
 
   let savePath = FileManager.documentsDirectory.appendingPathExtension("SavedRollas.json")
@@ -37,19 +39,31 @@ struct ContentView: View {
     var body: some View {
       NavigationView {
         Form {
-          Section {
-            Picker("Type of Dice", selection: $selectedDiceType) {
-              ForEach(diceTypes, id: \.self) { type in
-                Text("D\(type)")
+            Section {
+              Picker("Type of Dice", selection: $selectedDiceType) {
+                ForEach(diceTypes, id: \.self) { type in
+                  Text("D\(type)")
+                }
               }
-            }
-            .pickerStyle(.segmented)
-            Stepper("Number of Dice: \(numberToRoll)", value: $numberToRoll, in: 1...20)
-            Button("Roll Them!") {
-              withAnimation {
-                rollDice()
+              .pickerStyle(.segmented)
+              Stepper("Number of Dice: \(numberToRoll)", value: $numberToRoll, in: 1...20)
+              Button {
+                withAnimation {
+                  rollDice()
+                  isRolling.toggle()
+                }
+              } label: {
+                GeometryReader { geo in
+                  Label("Roll Them!", systemImage: "dice")
+                    .labelStyle(.iconOnly)
+                    .imageScale(.large)
+                    .rotationEffect(.degrees(isRolling ? 180 : 0))
+                    .offset(x: isRolling ? geo.frame(in: .global).midX * 0.9 : 0)
+                    .scaleEffect(isRolling ? 1.5 : 1)
+                    .padding(5)
+                    .animation(.spring(blendDuration: 1), value: isRolling)
+                }
               }
-            }
           } footer: {
             LazyVGrid(columns: columns) {
               ForEach(0..<currentResult.rolls.count, id: \.self) { rollNumber in
@@ -97,7 +111,6 @@ struct ContentView: View {
   //MARK: - View Methods
   func rollDice() {
     currentResult = DiceResult(type: selectedDiceType, number: numberToRoll)
-
     if voiceOverEnabled {
       stoppedDice = numberToRoll
       savedResults.insert(currentResult, at: 0)
@@ -105,7 +118,6 @@ struct ContentView: View {
     } else {
       stoppedDice = -20
     }
-
     stoppedDice = 0
   }
 
@@ -135,6 +147,7 @@ struct ContentView: View {
     if let data = try? JSONEncoder().encode(savedResults) {
       try? data.write(to: savePath, options: [.atomic, .completeFileProtection])
     }
+    isRolling.toggle()
   }
 }
 
